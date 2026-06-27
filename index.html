@@ -480,12 +480,32 @@ async function saveRemote() {
   }
 }
 
+function cascadeDatesFrom(startIdx) {
+  // Find the date of the row just before startIdx to base subsequent months from
+  let baseDate;
+  if (startIdx === 0) {
+    baseDate = new Date();
+  } else {
+    const p = state[startIdx - 1].date.split('-');
+    baseDate = new Date(+p[0], +p[1] - 1, +p[2]);
+  }
+  for (let j = startIdx; j < state.length; j++) {
+    if (!state[j].editingDate) {
+      // next 1st of month from baseDate, offset by (j - startIdx + 1) months
+      const d = new Date(baseDate);
+      d.setMonth(d.getMonth() + (j - startIdx + 1));
+      d.setDate(1);
+      state[j].date = toInputVal(d);
+    }
+  }
+}
+
 function scheduleSave() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(saveRemote, 1200);
 }
 
-const NUM = 18;
+const NUM = 30;
 const state = [];
 
 function addMonths(d, n) {
@@ -580,7 +600,14 @@ function renderRows() {
     toggleCell.className = 'toggle-cell';
     const label = document.createElement('label'); label.className = 'toggle';
     const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = row.paid;
-    cb.addEventListener('change', () => { state[i].paid = cb.checked; renderRows(); recalc(); scheduleSave(); });
+    cb.addEventListener('change', () => {
+      state[i].paid = cb.checked;
+      if (cb.checked) {
+        // cascade all unpaid dates after this row
+        cascadeDatesFrom(i + 1);
+      }
+      renderRows(); recalc(); scheduleSave();
+    });
     const sliderSpan = document.createElement('span'); sliderSpan.className = 'slider';
     label.appendChild(cb); label.appendChild(sliderSpan);
     toggleCell.appendChild(label);
